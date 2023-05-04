@@ -1,70 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Measure</title>
-    <link rel="stylesheet" href="node_modules/ol/ol.css" />
-    <style>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8' />
+  <title>Measure</title>
+  <link rel='stylesheet' href='node_modules/ol/ol.css' />
+  <style>
       .map {
-        width: 100%;
-        height: 400px;
+          width: 100%;
+          height: 400px;
       }
+
       .ol-tooltip {
-        position: relative;
-        background: rgba(0, 0, 0, 0.5);
-        border-radius: 4px;
-        color: white;
-        padding: 4px 8px;
-        opacity: 0.7;
-        white-space: nowrap;
-        font-size: 12px;
-        cursor: default;
-        user-select: none;
+          position: relative;
+          background: rgba(0, 0, 0, 0.5);
+          border-radius: 4px;
+          color: white;
+          padding: 4px 8px;
+          opacity: 0.7;
+          white-space: nowrap;
+          font-size: 12px;
+          cursor: default;
+          user-select: none;
       }
+
       .ol-tooltip-measure {
-        opacity: 1;
-        font-weight: bold;
+          opacity: 1;
+          font-weight: bold;
       }
+
       .ol-tooltip-static {
-        background-color: #ffcc33;
-        color: black;
-        border: 1px solid white;
+          background-color: #ffcc33;
+          color: black;
+          border: 1px solid white;
       }
+
       .ol-tooltip-measure:before,
       .ol-tooltip-static:before {
-        border-top: 6px solid rgba(0, 0, 0, 0.5);
-        border-right: 6px solid transparent;
-        border-left: 6px solid transparent;
-        content: '';
-        position: absolute;
-        bottom: -6px;
-        margin-left: -7px;
-        left: 50%;
+          border-top: 6px solid rgba(0, 0, 0, 0.5);
+          border-right: 6px solid transparent;
+          border-left: 6px solid transparent;
+          content: '';
+          position: absolute;
+          bottom: -6px;
+          margin-left: -7px;
+          left: 50%;
       }
-      .ol-tooltip-static:before {
-        border-top-color: #ffcc33;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="map" class="map"></div>
-    <div>
-      <!-- https://www.lawnstarter.com/blog/roofing/types-of-roof-styles/ -->
-      <label for="type">Type of roof &nbsp;</label>
 
-      <select id="type">
-        <option value="flat">Flat Roof </option>
-        <option value="gable">Gable Roof </option>
-        <option value="hip">Hip Roof </option>
-        <option value="pyramid">Pyramid Roof </option>
-        <option value="skillion">Skillion Roof </option>
-        <option value="saltbox">Saltbox Roof </option>
-      </select>
-      <div class="area"></div>
+      .ol-tooltip-static:before {
+          border-top-color: #ffcc33;
+      }
+
+      .mt
+      {
+          margin-top: 20px;
+      }
+
+  </style>
+</head>
+<body>
+<div id='map' class='map'></div>
+<div class='mt'>
+
+  <div>
+    <label for='type'>Type of polygon</label>
+    <select id='type'>
+      <option value='main'>Main</option>
+      <option value='exclude'>Exclude</option>
+    </select>
+  </div>
+
+  <div class='mt'>
+    <!-- https://www.lawnstarter.com/blog/roofing/types-of-roof-styles/ -->
+    <label for='roof'>Type of roof &nbsp;</label>
+    <select id='roof'>
+      <option value='flat'>Flat Roof</option>
+      <option value='gable'>Gable Roof</option>
+      <option value='hip'>Hip Roof</option>
+<!--      <option value='pyramid'>Pyramid Roof</option>-->
+<!--      <option value='skillion'>Skillion Roof</option>-->
+<!--      <option value='saltbox'>Saltbox Roof</option>-->
+    </select>
+  </div>
+  <div class='mt'>
+
+    <div id='area-all'>
+
+
     </div>
 
-    <!-- Pointer events polyfill for old browsers, see https://caniuse.com/#feat=pointer -->
-    <script src="https://cdn.jsdelivr.net/npm/elm-pep@1.0.6/dist/elm-pep.js"></script>
-    <script type="module" src="main.js"></script>
-  </body>
+  </div>
+</div>
+
+<!-- Pointer events polyfill for old browsers, see https://caniuse.com/#feat=pointer -->
+<script src='https://cdn.jsdelivr.net/npm/elm-pep@1.0.6/dist/elm-pep.js'></script>
+<script type='module' src='main.js'></script>
+</body>
 </html>

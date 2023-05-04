@@ -8,9 +8,22 @@ import {OSM, Vector as VectorSource} from 'ol/source.js';
 import {Tile as TileLayer, Vector as VectorLayer} from 'ol/layer.js';
 import {getArea} from 'ol/sphere.js';
 import {unByKey} from 'ol/Observable.js';
-import {transform} from 'ol/proj.js';
+import {fromLonLat} from 'ol/proj.js';
+import {v4 as uuidv4} from 'uuid';
+
+
+const polygons = {};
+let polygonType = document.getElementById('type');
+let roofSelect = document.getElementById('roof');
+
+
 const raster = new TileLayer({
   source: new OSM(),
+
+  // source: new XYZ({
+  //   url: 'https://{a-c}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png' +
+  //     '?apikey=Your API key from http://www.thunderforest.com/docs/apikeys/ here'
+  // })
 });
 
 const source = new VectorSource();
@@ -19,16 +32,16 @@ const vector = new VectorLayer({
   source: source,
   style: {
     'fill-color': 'rgba(255, 255, 255, 0.2)',
-    'stroke-color': '#ffcc33',
+    'stroke-color': '#002cff',
     'stroke-width': 2,
-    'circle-radius': 7,
+    'circle-radius': 3,
     'circle-fill-color': '#ffcc33',
   },
 });
 
 /**
  * Currently drawn feature.
- * @type {import("../src/ol/Feature.js").default}
+ * @type {import('../src/ol/Feature.js').default}
  */
 let sketch;
 
@@ -56,29 +69,30 @@ let measureTooltipElement;
  */
 let measureTooltip;
 
-/**
- * Handle pointer move.
- * @param {import("../src/ol/MapBrowserEvent").default} evt The event.
- */
-const pointerMoveHandler = function (evt) {
-  if (evt.dragging) {
-    return;
-  }
+let selectedPolygonType = polygonType.value;
 
-  helpTooltipElement.innerHTML = 'Click to continue drawing the polygon';
-  helpTooltip.setPosition(evt.coordinate);
-
-  helpTooltipElement.classList.remove('hidden');
+polygonType.onchange = function() {
+  selectedPolygonType = polygonType.value;
 };
 
 const map = new Map({
   layers: [raster, vector],
   target: 'map',
   view: new View({
-    center: transform([14.277968, 48.280201], 'EPSG:4326', 'EPSG:900913'),
+    center: fromLonLat([14.277968, 48.280201]),
     zoom: 20,
   }),
 });
+
+// map.addLayer(new OpenLayers.Layer.XYZ(
+//   "Satellite", [
+//     "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}"
+//   ], {
+//     attribution: "Powered by Esri. " +
+//       "Source: Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community",
+//     numZoomLevels: 24,
+//     sphericalMercator: true
+//   }))
 
 const modify = new Modify({source: source});
 map.addInteraction(modify);
@@ -86,11 +100,7 @@ map.addInteraction(modify);
 const snap = new Snap({source: source});
 map.addInteraction(snap);
 
-map.on('pointermove', pointerMoveHandler);
-
-map.getViewport().addEventListener('mouseout', function () {
-  helpTooltipElement.classList.add('hidden');
-});
+enableMouseOverTooltip();
 
 let draw; // global so we can remove it later
 
@@ -99,8 +109,25 @@ let draw; // global so we can remove it later
  * @param {Polygon} polygon The polygon.
  * @return {string} Formatted area.
  */
-const formatArea = function (polygon) {
-  const area = getArea(polygon);
+const calcArea = function(polygon) {
+  let area = getArea(polygon);
+
+  if( roofSelect.value !== 'flat')
+    area = area * 1.115;
+
+  if (area > 10000) {
+    return Math.round((area / 1000000) * 100) / 100;
+  }
+
+  return Math.round(area * 100) / 100;
+};
+
+
+const formatAreaFormatted = function(polygon) {
+  let area = getArea(polygon);
+
+  if( roofSelect.value !== 'flat')
+    area = area * 1.115;
 
   if (area > 10000) {
     return Math.round((area / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
@@ -108,6 +135,25 @@ const formatArea = function (polygon) {
 
   return Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
 };
+
+
+function enableMouseOverTooltip() {
+  const pointerMoveHandler = function(evt) {
+    if (evt.dragging) {
+      return;
+    }
+    helpTooltipElement.innerHTML = 'Click to continue drawing the polygon';
+    helpTooltip.setPosition(evt.coordinate);
+
+    helpTooltipElement.classList.remove('hidden');
+  };
+
+  map.on('pointermove', pointerMoveHandler);
+
+  map.getViewport().addEventListener('mouseout', function() {
+    helpTooltipElement.classList.add('hidden');
+  });
+}
 
 function addInteraction() {
   draw = new Draw({
@@ -118,17 +164,13 @@ function addInteraction() {
         color: 'rgba(255, 255, 255, 0.2)',
       }),
       stroke: new Stroke({
-        color: 'rgba(0, 0, 0, 0.5)',
-        lineDash: [10, 10],
+        color: (selectedPolygonType === 'main' ? '#000000' : '#cc0000'),
         width: 2,
       }),
       image: new CircleStyle({
-        radius: 5,
-        stroke: new Stroke({
-          color: 'rgba(0, 0, 0, 0.7)',
-        }),
+        radius: 3,
         fill: new Fill({
-          color: 'rgba(255, 255, 255, 0.2)',
+          color: '#ffcc33',
         }),
       }),
     }),
@@ -140,38 +182,57 @@ function addInteraction() {
   createHelpTooltip();
 
   let listener;
-  draw.on('drawstart', function (evt) {
+  draw.on('drawstart', function(evt) {
+
     // set sketch
     sketch = evt.feature;
 
-    /** @type {import("../src/ol/coordinate.js").Coordinate|undefined} */
+    /** @type {import('../src/ol/coordinate.js').Coordinate|undefined} */
     let tooltipCoord = evt.coordinate;
 
-    listener = sketch.getGeometry().on('change', function (evt) {
+    listener = sketch.getGeometry().on('change', function(evt) {
       const geom = evt.target;
       let output;
-      output = formatArea(geom);
+      output = formatAreaFormatted(geom);
       tooltipCoord = geom.getInteriorPoint().getCoordinates();
       measureTooltipElement.innerHTML = output;
       measureTooltip.setPosition(tooltipCoord);
     });
 
-    //map.getLayers().getArray()[1].getSource().clear();
 
-    const allGeometries = map
-      .getLayers()
-      .getArray()[1]
-      .getSource()
-      .getFeatures();
-
-    allGeometries.forEach(function (geometries) {
-      var coordinates = geometries.getGeometry().getArea();
-
-      console.log(coordinates);
-    });
   });
 
-  draw.on('drawend', function () {
+  draw.on('drawend', function(evt) {
+
+    let feature = evt.feature;
+    const uuid = uuidv4();
+
+    feature.setId(uuid);
+    feature.setProperties({
+      type: selectedPolygonType,
+      roof: roofSelect.value,
+      area: calcArea(feature.getGeometry())
+    });
+
+    let style = new Style({
+      stroke: new Stroke({
+        color: selectedPolygonType === 'main' ? "#000000" : "#cc0000",
+        width: 2
+      }),
+      fill: new Fill({
+        color: 'rgba(255, 255, 255, 0.2)',
+      })
+    });
+
+    feature.setStyle(style)
+
+    polygons[uuid] = feature;
+
+    //console.log( polygons );
+
+    // console.log(polygons);
+    // console.log(getArea(feature.getGeometry()));
+
     measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
     measureTooltip.setOffset([0, -7]);
     // unset sketch
@@ -180,7 +241,56 @@ function addInteraction() {
     measureTooltipElement = null;
     createMeasureTooltip();
     unByKey(listener);
+
+    calcPVArea();
   });
+}
+
+// function listAllPolygons()
+// {
+//
+//   const allGeometries = map
+//     .getLayers()
+//     .getArray()[1]
+//     .getSource()
+//     .getFeatures();
+//
+//   console.log(allGeometries);
+//
+//
+//   allGeometries.forEach(function(geometries) {
+//     let area = getArea(geometries.getGeometry());
+//     console.log(area);
+//   });
+//
+// }
+
+
+function calcPVArea()
+{
+  let availableArea = 0.0;
+  let excludedArea = 0.0;
+  const avgPvArea = 1.998108;
+
+  for(let x in polygons ){
+
+    const polygon = polygons[x];
+
+    if( polygon.values_.type === 'main' )
+      availableArea += polygon.values_.area;
+    else
+      excludedArea += polygon.values_.area;
+  }
+
+  const final = Math.max(0, availableArea - excludedArea);
+
+  document.getElementById('area-all').innerHTML =
+    "All: " + availableArea + '<br />' +
+    "Excluded: " + excludedArea + '<br />' +
+    "Clear: " + final + '<br />' +
+    "Number of PV: " + Math.floor(final / avgPvArea);
+
+  //console.log("Clear: " + availableArea);
 }
 
 /**
