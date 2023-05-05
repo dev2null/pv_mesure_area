@@ -1,2 +1,5 @@
 # pv_mesure_area
-Created with CodeSandbox
+
+### npm i
+
+### npm start 

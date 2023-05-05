@@ -6,20 +6,14 @@ import {Circle as CircleStyle, Fill, Stroke, Style} from 'ol/style.js';
 //import {Polygon} from 'ol/geom.js';
 import {OSM, Vector as VectorSource} from 'ol/source.js';
 import {Tile as TileLayer, Vector as VectorLayer} from 'ol/layer.js';
-import {getArea} from 'ol/sphere.js';
 import {unByKey} from 'ol/Observable.js';
 import {fromLonLat} from 'ol/proj.js';
-import {v4 as uuidv4} from 'uuid';
+import AreaPV from './area';
 
-
-const polygons = {};
-let polygonType = document.getElementById('type');
-let roofSelect = document.getElementById('roof');
-
+const areaPVPolygon = new AreaPV();
 
 const raster = new TileLayer({
   source: new OSM(),
-
   // source: new XYZ({
   //   url: 'https://{a-c}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png' +
   //     '?apikey=Your API key from http://www.thunderforest.com/docs/apikeys/ here'
@@ -27,7 +21,6 @@ const raster = new TileLayer({
 });
 
 const source = new VectorSource();
-
 const vector = new VectorLayer({
   source: source,
   style: {
@@ -69,12 +62,6 @@ let measureTooltipElement;
  */
 let measureTooltip;
 
-let selectedPolygonType = polygonType.value;
-
-polygonType.onchange = function() {
-  selectedPolygonType = polygonType.value;
-};
-
 const map = new Map({
   layers: [raster, vector],
   target: 'map',
@@ -83,16 +70,6 @@ const map = new Map({
     zoom: 20,
   }),
 });
-
-// map.addLayer(new OpenLayers.Layer.XYZ(
-//   "Satellite", [
-//     "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}"
-//   ], {
-//     attribution: "Powered by Esri. " +
-//       "Source: Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community",
-//     numZoomLevels: 24,
-//     sphericalMercator: true
-//   }))
 
 const modify = new Modify({source: source});
 map.addInteraction(modify);
@@ -103,39 +80,6 @@ map.addInteraction(snap);
 enableMouseOverTooltip();
 
 let draw; // global so we can remove it later
-
-/**
- * Format area output.
- * @param {Polygon} polygon The polygon.
- * @return {string} Formatted area.
- */
-const calcArea = function(polygon) {
-  let area = getArea(polygon);
-
-  if( roofSelect.value !== 'flat')
-    area = area * 1.115;
-
-  if (area > 10000) {
-    return Math.round((area / 1000000) * 100) / 100;
-  }
-
-  return Math.round(area * 100) / 100;
-};
-
-
-const formatAreaFormatted = function(polygon) {
-  let area = getArea(polygon);
-
-  if( roofSelect.value !== 'flat')
-    area = area * 1.115;
-
-  if (area > 10000) {
-    return Math.round((area / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
-  }
-
-  return Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
-};
-
 
 function enableMouseOverTooltip() {
   const pointerMoveHandler = function(evt) {
@@ -156,6 +100,7 @@ function enableMouseOverTooltip() {
 }
 
 function addInteraction() {
+
   draw = new Draw({
     source: source,
     type: 'Polygon',
@@ -164,7 +109,7 @@ function addInteraction() {
         color: 'rgba(255, 255, 255, 0.2)',
       }),
       stroke: new Stroke({
-        color: (selectedPolygonType === 'main' ? '#000000' : '#cc0000'),
+        color: (areaPVPolygon.getSelectedPolygonType() === 'main' ? '#000000' : '#cc0000'),
         width: 2,
       }),
       image: new CircleStyle({
@@ -178,9 +123,6 @@ function addInteraction() {
 
   map.addInteraction(draw);
 
-  createMeasureTooltip();
-  createHelpTooltip();
-
   let listener;
   draw.on('drawstart', function(evt) {
 
@@ -193,7 +135,7 @@ function addInteraction() {
     listener = sketch.getGeometry().on('change', function(evt) {
       const geom = evt.target;
       let output;
-      output = formatAreaFormatted(geom);
+      output = areaPVPolygon.formatAreaFormatted(geom);
       tooltipCoord = geom.getInteriorPoint().getCoordinates();
       measureTooltipElement.innerHTML = output;
       measureTooltip.setPosition(tooltipCoord);
@@ -205,33 +147,12 @@ function addInteraction() {
   draw.on('drawend', function(evt) {
 
     let feature = evt.feature;
-    const uuid = uuidv4();
 
-    feature.setId(uuid);
-    feature.setProperties({
-      type: selectedPolygonType,
-      roof: roofSelect.value,
-      area: calcArea(feature.getGeometry())
-    });
+    if (!areaPVPolygon.isSquareMeters(feature.getGeometry())) {
+      return false;
+    }
 
-    let style = new Style({
-      stroke: new Stroke({
-        color: selectedPolygonType === 'main' ? "#000000" : "#cc0000",
-        width: 2
-      }),
-      fill: new Fill({
-        color: 'rgba(255, 255, 255, 0.2)',
-      })
-    });
-
-    feature.setStyle(style)
-
-    polygons[uuid] = feature;
-
-    //console.log( polygons );
-
-    // console.log(polygons);
-    // console.log(getArea(feature.getGeometry()));
+    areaPVPolygon.addPolygon(feature);
 
     measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
     measureTooltip.setOffset([0, -7]);
@@ -242,9 +163,13 @@ function addInteraction() {
     createMeasureTooltip();
     unByKey(listener);
 
-    calcPVArea();
+    ///calcPVArea();
   });
+
+  createMeasureTooltip();
+  createHelpTooltip();
 }
+
 
 // function listAllPolygons()
 // {
@@ -264,34 +189,6 @@ function addInteraction() {
 //   });
 //
 // }
-
-
-function calcPVArea()
-{
-  let availableArea = 0.0;
-  let excludedArea = 0.0;
-  const avgPvArea = 1.998108;
-
-  for(let x in polygons ){
-
-    const polygon = polygons[x];
-
-    if( polygon.values_.type === 'main' )
-      availableArea += polygon.values_.area;
-    else
-      excludedArea += polygon.values_.area;
-  }
-
-  const final = Math.max(0, availableArea - excludedArea);
-
-  document.getElementById('area-all').innerHTML =
-    "All: " + availableArea + '<br />' +
-    "Excluded: " + excludedArea + '<br />' +
-    "Clear: " + final + '<br />' +
-    "Number of PV: " + Math.floor(final / avgPvArea);
-
-  //console.log("Clear: " + availableArea);
-}
 
 /**
  * Creates a new help tooltip
